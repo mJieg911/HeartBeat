@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最最喜欢你 - 震撼重叠铺满版</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --btn-pink: #ff4757;
+            --btn-purple: #a55eea;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            width: 100%;
+            height: 100%;
+        }
+
+        #fireworks {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9000;
+        }
+
+        .fake-window {
+            position: absolute;
+            background: #fff;
+            border-radius: 6px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+            /* 加深阴影突出层叠立体感 */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            user-select: none;
+            z-index: 10;
+            transform-origin: center center;
+        }
+
+        .title-bar {
+            height: 18px;
+            background: #f3f3f3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 6px;
+            font-size: 10px;
+            color: #888;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .close-dots {
+            color: #ff5f56;
+            letter-spacing: 1px;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 4px;
+            text-align: center;
+            font-weight: bold;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .big-heart {
+            z-index: 2000 !important;
+            border: 2px solid #fff;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .big-heart .content {
+            color: #d63031;
+            flex-direction: column;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0) rotate(-10deg);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .control-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            padding: 8px 20px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 9999;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .btn-play {
+            background: var(--btn-pink);
+        }
+
+        .btn-clear {
+            background: var(--btn-purple);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        @media (max-width: 600px) {
+            .control-bar {
+                bottom: 20px;
+                padding: 6px 12px;
+                gap: 8px;
+            }
+
+            .btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="fireworks"></canvas>
+
+    <div class="control-bar">
+        <button class="btn btn-play" onclick="startSequence()">✨ 重新开始</button>
+        <button class="btn btn-clear" onclick="clearAll()">🗑️ 清空</button>
+    </div>
+
+    <script>
+        const colors = ["#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF", "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FF9AA2", "#C7CEEA"];
+        const textList = [
+            "最喜欢你", "你是唯一", "怦然心动", "满眼是你", "一见钟情",
+            "只为你心动", "梦里全是你", "非你不可", "心里装满了你", "爱你每一天",
+            "往后余生", "遇见你真好", "你是我的星辰", "你是人间理想", "余生皆是你",
+            "万物不如你", "春风十里不如你", "你是所有美好的总和", "山河远阔 唯你是值得", "星河滚烫 你是人间理想",
+            "亲爱的", "照顾好自己", "记得微笑", "想见你", "我的宝",
+            "想要抱抱你", "你比糖还甜", "给你所有的温柔", "乖乖等你", "想和你去流浪",
+            "永远在一起", "陪你到老", "一生一世", "守你一生", "你是我的底气",
+            "只为守护你", "我的心只为你跳动", "此生无憾", "我们要一直好好的", "认定你了", "被你治愈了"
+        ];
+        let timers = [];
+        let resizeTimer = null;
+        let isAnimating = false;
+
+        /**
+         * 从URL路径参数获取最后一个弹窗的文本内容
+         * 如果获取失败则返回默认值"最最喜欢你"
+         * @returns {string} 弹窗文本内容
+         */
+        function getFinalText() {
+            // 尝试从URL的hash参数获取
+            const hash = window.location.hash.substring(1); // 去掉开头的#
+            if (hash && hash.trim()) {
+                return decodeURIComponent(hash.trim());
+            }
+            
+            // 尝试从URL的search参数获取
+            const params = new URLSearchParams(window.location.search);
+            const text = params.get('text') || params.get('message') || params.get('msg');
+            if (text && text.trim()) {
+                return decodeURIComponent(text.trim());
+            }
+            
+            // 如果都获取失败，返回默认值
+            return "最最喜欢你";
+        }
+
+        // --- 1. 画布与烟花系统 ---
+        const canvas = document.getElementById('fireworks');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        /**
+         * 调整画布尺寸以匹配窗口大小
+         * 确保烟花效果能覆盖整个可视区域
+         */
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        /**
+         * 烟花粒子类
+         * 用于创建和管理单个烟花粒子的位置、速度、生命周期等属性
+         */
+        class Particle {
+            /**
+             * 构造函数：初始化烟花粒子
+             * @param {number} x - 粒子初始x坐标
+             * @param {number} y - 粒子初始y坐标
+             * @param {string} color - 粒子颜色
+             */
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.015;
+                this.size = Math.random() * 3 + 1.5;
+            }
+            /**
+             * 更新粒子状态
+             * 包括位置移动、重力影响和生命值衰减
+             */
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.08; // 重力
+                this.life -= this.decay;
+            }
+            /**
+             * 绘制粒子
+             * 在画布上渲染当前粒子，透明度随生命值变化
+             */
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        /**
+         * 烟花动画主循环
+         * 持续更新和绘制所有粒子，移除已消亡的粒子
+         * 使用requestAnimationFrame实现流畅动画
+         */
+        function loop() {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                if (p.life <= 0) particles.splice(i, 1);
+                else p.draw();
+            }
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+
+        /**
+         * 创建烟花爆炸效果
+         * 在指定位置生成多个粒子形成爆炸效果
+         * @param {number} x - 爆炸中心x坐标
+         * @param {number} y - 爆炸中心y坐标
+         * @param {string} color - 烟花颜色
+         * @param {number} particleCount - 粒子数量，默认40个
+         */
+        function createExplosion(x, y, color, particleCount = 40) {
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+
+        // --- 2. 核心逻辑与动画控制 ---
+        /**
+         * 获取当前配置参数
+         * 根据窗口大小动态计算缩放比例、窗口尺寸和弹窗数量
+         * @returns {Object} 包含屏幕宽度、高度、缩放比例、窗口尺寸和数量的配置对象
+         */
+        function getConfigs() {
+            const sw = window.innerWidth;
+            const sh = window.innerHeight;
+            const scale = Math.min(sw, sh) / 25 * 0.7;
+            const winW = Math.max(80, sw * 0.10);
+            const winH = winW * 0.7;
+            const count = Math.floor(scale * 5);
+            return { sw, sh, scale, winW, winH, count };
+        }
+
+        /**
+         * 添加定时器到管理队列
+         * 便于统一管理和清除所有定时器
+         * @param {Function} fn - 延迟执行的函数
+         * @param {number} delay - 延迟时间（毫秒）
+         * @returns {number} 定时器ID
+         */
+        function addTimer(fn, delay) {
+            const t = setTimeout(fn, delay);
+            timers.push(t);
+            return t;
+        }
+
+        /**
+         * 清空所有动画元素和状态
+         * 清除所有定时器、粒子、画布内容和弹窗，重置动画状态
+         */
+        function clearAll() {
+            timers.forEach(t => clearTimeout(t));
+            timers = [];
+            particles = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.querySelectorAll('.fake-window').forEach(win => win.remove());
+            isAnimating = false;
+        }
+
+        /**
+         * 创建弹窗元素
+         * 在指定位置创建模拟窗口，可选择是否伴随烟花效果
+         * @param {number} x - 弹窗中心x坐标
+         * @param {number} y - 弹窗中心y坐标
+         * @param {string} text - 弹窗显示的文本内容
+         * @param {string} color - 弹窗背景颜色
+         * @param {number} delay - 延迟显示时间（毫秒）
+         * @param {boolean} isBig - 是否为大号弹窗（中心弹窗）
+         * @param {boolean} withFirework - 是否伴随烟花效果
+         * @param {number} particleCount - 烟花粒子数量，默认40个
+         */
+        function createWin(x, y, text, color, delay, isBig = false, withFirework = false, particleCount = 40) {
+            const cfg = getConfigs();
+            addTimer(() => {
+                const div = document.createElement('div');
+                div.className = isBig ? 'fake-window big-heart' : 'fake-window';
+
+                const w = isBig ? cfg.winW * 2 : cfg.winW;
+                const h = isBig ? cfg.winH * 2 : cfg.winH;
+
+                div.style.width = w + 'px';
+                div.style.height = h + 'px';
+                div.style.left = (x - w / 2) + 'px';
+                div.style.top = (y - h / 2) + 'px';
+
+                // 给层叠的窗口添加随机微微旋转，让铺满效果更自然
+                if (!isBig) {
+                    div.style.transform = `rotate(${(Math.random() - 0.5) * 10}deg)`;
+                }
+
+                div.innerHTML = `
+                    <div class="title-bar" style="height: ${w * 0.15}px">
+                        <span style="font-size: ${w * 0.08}px">${isBig ? 'LOVE' : '亲爱的'}</span>
+                        <span class="close-dots" style="font-size: ${w * 0.08}px">● ● ●</span>
+                    </div>
+                    <div class="content" style="background-color: ${color}; font-size: ${isBig ? w * 0.18 : w * 0.1}px">
+                        ${text}
+                    </div>
+                `;
+                document.body.appendChild(div);
+
+                if (withFirework) {
+                    // 发射烟花（位置在弹窗中心）
+                    createExplosion(x, y, color, particleCount);
+                }
+            }, delay);
+        }
+
+        /**
+         * 启动心形动画序列
+         * 先清空画布，然后按心形轨迹依次弹出窗口，最后在中心显示大窗口
+         * 心形使用参数方程生成，弹窗按时间间隔依次出现
+         */
+        function startSequence() {
+            if (isAnimating) return;
+            isAnimating = true;
+            clearAll();
+
+            const cfg = getConfigs();
+            const centerX = cfg.sw / 2;
+            const centerY = cfg.sh / 2 - (cfg.sh * 0.05);
+
+            for (let i = 0; i < cfg.count; i++) {
+                let t = (i / cfg.count) * Math.PI * 2;
+                let x = 16 * Math.pow(Math.sin(t), 3);
+                let y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+
+                let posX = centerX + x * cfg.scale;
+                let posY = centerY + y * cfg.scale;
+
+                let randomColor = colors[Math.floor(Math.random() * colors.length)];
+                let randomText = textList[Math.floor(Math.random() * textList.length)];
+
+                const speed = 4000 / cfg.count;
+                createWin(posX, posY, randomText, randomColor, i * speed);
+            }
+
+            createWin(centerX, centerY, getFinalText() + "<br>❤️", "#fff", 4200, true);
+            addTimer(() => animateDisappear(), 5200);
+        }
+
+        /**
+         * 执行弹窗消失动画
+         * 所有弹窗先汇聚到中心，然后向四周爆炸散开并消失
+         * 分两个阶段：汇聚（0.8秒）和爆炸散开（0.8秒）
+         */
+        function animateDisappear() {
+            const windows = document.querySelectorAll('.fake-window');
+            const cfg = getConfigs();
+            const cx = cfg.sw / 2;
+            const cy = cfg.sh / 2;
+
+            windows.forEach(win => {
+                win.style.animation = 'none';
+                win.style.transition = 'all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                win.style.left = (cx - win.offsetWidth / 2) + 'px';
+                win.style.top = (cy - win.offsetHeight / 2) + 'px';
+                win.style.transform = 'scale(0.1) rotate(0deg)';
+                win.style.opacity = '0.5';
+            });
+
+            addTimer(() => {
+                windows.forEach(win => {
+                    win.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    let angle = Math.random() * Math.PI * 2;
+                    let distance = Math.max(cfg.sw, cfg.sh) * 0.8;
+                    let targetX = cx + Math.cos(angle) * distance;
+                    let targetY = cy + Math.sin(angle) * distance;
+
+                    win.style.left = (targetX - win.offsetWidth / 2) + 'px';
+                    win.style.top = (targetY - win.offsetHeight / 2) + 'px';
+                    win.style.transform = 'scale(1.5) rotate(' + (Math.random() * 360 - 180) + 'deg)';
+                    win.style.opacity = '0';
+                });
+
+                addTimer(() => {
+                    windows.forEach(w => w.remove());
+                    startRandomFireworks();
+                }, 800);
+            }, 800);
+        }
+
+        // --- 重磅升级：高密度重叠铺满算法 ---
+        /**
+         * 启动全屏随机烟花弹窗效果
+         * 使用高密度网格算法，让弹窗密集重叠铺满整个屏幕
+         * 每个弹窗伴随烟花效果，通过降低单次粒子数保证性能
+         */
+        function startRandomFireworks() {
+            const cfg = getConfigs();
+
+            // 核心思路：让划定的网格远小于弹窗尺寸（0.5倍），以此产生密集的重叠
+            const cellW = cfg.winW * 0.5;
+            const cellH = cfg.winH * 0.5;
+
+            // 根据小网格计算行列数，这会产生极大量的弹窗 (可能有几百个)
+            const cols = Math.ceil(cfg.sw / cellW) + 1;
+            const rows = Math.ceil(cfg.sh / cellH) + 1;
+
+            let positions = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // 在小网格内再进行随机偏移，完美实现“既均匀铺满又高度随机层叠”
+                    let x = c * cellW + (Math.random() * cellW) - (cfg.winW / 2);
+                    let y = r * cellH + (Math.random() * cellH) - (cfg.winH / 2);
+                    positions.push({ x, y });
+                }
+            }
+
+            // 彻底打乱数组，让弹出位置看起来是乱序全屏乱射的
+            positions.sort(() => Math.random() - 0.5);
+
+            // 设定总共用 4 秒时间弹完这些海量弹窗
+            const totalDuration = 4000;
+            const delayStep = totalDuration / positions.length;
+
+            positions.forEach((pos, i) => {
+                let color = colors[Math.floor(Math.random() * colors.length)];
+                let text = textList[Math.floor(Math.random() * textList.length)];
+
+                // 性能保护：如果是海量弹窗，单次烟花粒子数降到 15 颗，避免浏览器崩溃，但满屏加起来依然极度绚丽
+                createWin(pos.x, pos.y, text, color, i * delayStep, false, true, 15);
+            });
+
+            addTimer(() => { isAnimating = false; }, totalDuration + 500);
+        }
+
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (!isAnimating) startSequence();
+            }, 300);
+        });
+
+        window.onload = startSequence;
+
+    </script>
+</body>
+
+</html>

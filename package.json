@@ -1,0 +1,17 @@
+{
+  "name": "love-animation",
+  "version": "1.0.0",
+  "description": "震撼重叠铺满版爱心动画 - 最最喜欢你",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static site - no build required'"
+  },
+  "keywords": [
+    "love",
+    "animation",
+    "fireworks",
+    "heart"
+  ],
+  "author": "",
+  "license": "MIT"
+}
