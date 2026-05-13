@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>最最喜欢你 - 震撼重叠铺满版</title>
+    <title>最最喜欢你</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -157,12 +157,93 @@
                 font-size: 12px;
             }
         }
+
+        /* 开始提示界面 */
+        #startPrompt {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            cursor: pointer;
+            background: radial-gradient(circle at center, #2d1f3d 0%, #1a1a1a 100%);
+        }
+
+        .prompt-heart {
+            font-size: 80px;
+            animation: heartbeat 1.5s ease-in-out infinite;
+            margin-bottom: 30px;
+            filter: drop-shadow(0 0 20px rgba(255, 71, 87, 0.6));
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .prompt-text {
+            font-size: 32px;
+            color: #fff;
+            text-align: center;
+            animation: fadeInUp 1s ease-out;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .prompt-hint {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.6);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        @media (max-width: 600px) {
+            .prompt-heart {
+                font-size: 60px;
+            }
+            .prompt-text {
+                font-size: 24px;
+            }
+            .prompt-hint {
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 
 <body>
 
+    <!-- 开始提示界面 -->
+    <div id="startPrompt">
+        <div class="prompt-heart">💕</div>
+        <div class="prompt-text">轻触屏幕，惊喜将为您呈现</div>
+        <div class="prompt-hint">点击任意位置开始</div>
+    </div>
+
     <canvas id="fireworks"></canvas>
+    
+    <!-- 背景音乐 -->
+    <audio id="bgAudio" src="./audio.mp3"></audio>
 
     <div class="control-bar">
         <button class="btn btn-play" onclick="startSequence()">✨ 重新开始</button>
@@ -184,6 +265,9 @@
         let timers = [];
         let resizeTimer = null;
         let isAnimating = false;
+        
+        // 获取音频元素
+        const bgAudio = document.getElementById('bgAudio');
 
         /**
          * 从URL路径参数获取最后一个弹窗的文本内容
@@ -408,6 +492,12 @@
             if (isAnimating) return;
             isAnimating = true;
             clearAll();
+            
+            // 从头开始播放音频
+            if (bgAudio) {
+                bgAudio.currentTime = 0;
+                bgAudio.play().catch(err => console.log('音频播放失败:', err));
+            }
 
             const cfg = getConfigs();
             const centerX = cfg.sw / 2;
@@ -424,12 +514,12 @@
                 let randomColor = colors[Math.floor(Math.random() * colors.length)];
                 let randomText = textList[Math.floor(Math.random() * textList.length)];
 
-                const speed = 4000 / cfg.count;
+                const speed = 8000 / cfg.count; // 原4000，延长至2倍
                 createWin(posX, posY, randomText, randomColor, i * speed);
             }
 
-            createWin(centerX, centerY, getFinalText() + "<br>❤️", "#fff", 4200, true);
-            addTimer(() => animateDisappear(), 5200);
+            createWin(centerX, centerY, getFinalText() + "<br>❤️", "#fff", 8400, true); // 原4200，延长至2倍
+            addTimer(() => animateDisappear(), 10400); // 原5200，延长至2倍
         }
 
         /**
@@ -503,8 +593,8 @@
             // 彻底打乱数组，让弹出位置看起来是乱序全屏乱射的
             positions.sort(() => Math.random() - 0.5);
 
-            // 设定总共用 4 秒时间弹完这些海量弹窗
-            const totalDuration = 4000;
+            // 设定总共用 8 秒时间弹完这些海量弹窗（原4秒，延长至2倍）
+            const totalDuration = 15000;
             const delayStep = totalDuration / positions.length;
 
             positions.forEach((pos, i) => {
@@ -525,7 +615,41 @@
             }, 300);
         });
 
-        window.onload = startSequence;
+        // 等待用户首次交互后启动
+        let hasStarted = false;
+        const startPrompt = document.getElementById('startPrompt');
+        
+        function startOnFirstInteraction() {
+            if (hasStarted) return;
+            hasStarted = true;
+            
+            // 隐藏提示界面
+            if (startPrompt) {
+                startPrompt.style.transition = 'opacity 0.5s ease-out';
+                startPrompt.style.opacity = '0';
+                setTimeout(() => {
+                    startPrompt.style.display = 'none';
+                }, 500);
+            }
+            
+            // 启动动画和音频
+            startSequence();
+            
+            // 移除所有监听器
+            document.removeEventListener('click', startOnFirstInteraction);
+            document.removeEventListener('touchstart', startOnFirstInteraction);
+            document.removeEventListener('keydown', startOnFirstInteraction);
+        }
+        
+        // 监听用户的首次交互
+        document.addEventListener('click', startOnFirstInteraction);
+        document.addEventListener('touchstart', startOnFirstInteraction);
+        document.addEventListener('keydown', startOnFirstInteraction);
+        
+        // 页面加载后等待用户交互
+        window.onload = () => {
+            console.log('页面已加载，点击任意位置开始心动之旅');
+        };
 
     </script>
 </body>
